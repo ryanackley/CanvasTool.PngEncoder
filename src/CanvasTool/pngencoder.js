@@ -12,14 +12,14 @@ goog.scope(function() {
 
 /**
  * Canvas to PNG converter
- * @param {!(Element|Array|Uint8Array|CanvasPixelArray)} canvas 対象となる
+ * @param {!(Element|Array|Uint8Array|CanvasPixelArray|{PLTE, tRNS, IDAT})} canvas 対象となる
  *     Canvas エレメント, もしくはその CanvasPixelArray 互換の配列.
  * @param {!Object=} opt_param 変換オプション. canvas が Canvas エレメントの場合
  *     以外では、かならず width と height が必要となる.
  * @constructor
  */
 CanvasTool.PngEncoder = function(canvas, opt_param) {
-  var ctx, width, height;
+  var ctx, width, height, imageInfo;
 
   /**
    * @type {!(Array|CanvasPixelArray|Uint8Array)}
@@ -51,6 +51,17 @@ CanvasTool.PngEncoder = function(canvas, opt_param) {
     width = opt_param['width'];
     height = opt_param['height'];
     this.data = canvas;
+  } else if (canvas instanceof Object) {
+    
+    imageInfo = {};
+    imageInfo.PLTE = canvas['PLTE'];
+    imageInfo.tRNS = canvas['tRNS'];
+    imageInfo.IDAT = canvas['IDAT'];
+    this.imageInfo = imageInfo;
+
+    width = opt_param['width'];
+    height = opt_param['height'];
+
   } else {
     throw new Error('invalid arguments');
   }
@@ -71,6 +82,8 @@ function(width, height, opt_param) {
   if (typeof opt_param !== 'object') {
     opt_param = {};
   }
+
+  
 
   /**
    * 横幅
@@ -463,106 +476,118 @@ CanvasTool.PngEncoder.prototype.convert = function(opt_canvasArray) {
  * @return {!Array} PNG バイナリ byte array.
  */
 CanvasTool.PngEncoder.prototype.convertToArray = function() {
-  var png = [], imageInfo;
+  var imageInfo;
 
-  imageInfo = this.makeImageArray(this.data);
+  imageInfo = this.imageInfo || this.makeImageArray(this.data);
 
   // signature
-  push_(png, CanvasTool.PngEncoder.Signature);
+  var sig = CanvasTool.PngEncoder.Signature;
 
   // IHDR
-  push_(png, this.makeIHDR_());
+  var hdr = this.makeIHDR_();
+
+  var plt, trns;
 
   // cHRM
-  if (typeof(this.chrm) === 'object' && this.chrm !== null) {
-    push_(png, this.makecHRM_(this.chrm));
-  }
+  // if (typeof(this.chrm) === 'object' && this.chrm !== null) {
+  //   push_(png, this.makecHRM_(this.chrm));
+  // }
 
   // gAMA
-  if (typeof(this.gamma) === 'number') {
-    push_(png, this.makegAMA_(this.gamma));
-  }
+  // if (typeof(this.gamma) === 'number') {
+  //   push_(png, this.makegAMA_(this.gamma));
+  // }
 
   // iCCP
-  if (typeof(this.iccp) === 'object' && this.iccp !== null) {
-    push_(png, this.makeiCCP_(this.iccp));
-  }
+  // if (typeof(this.iccp) === 'object' && this.iccp !== null) {
+  //   push_(png, this.makeiCCP_(this.iccp));
+  // }
 
   // sBIT
-  if (this.sbit instanceof Array) {
-    push_(png, this.makesBIT_(this.sbit));
-  }
+  // if (this.sbit instanceof Array) {
+  //   push_(png, this.makesBIT_(this.sbit));
+  // }
 
   // sRGB
-  if (typeof(this.srgb) === 'number') {
-    push_(png, this.makesRGB_(this.srgb));
-  }
+  // if (typeof(this.srgb) === 'number') {
+  //   push_(png, this.makesRGB_(this.srgb));
+  // }
 
   // PLTE
   switch (this.colourType) {
     case CanvasTool.PngEncoder.ColourType.INDEXED_COLOR:
-      push_(png, this.makePLTE_(imageInfo.PLTE));
+      plt = this.makePLTE_(imageInfo.PLTE);
       this.palette_ = imageInfo.PLTE;
 
       // bKGD
-      if (this.bkgd instanceof Array) {
-        push_(png, this.makebKGD_(this.bkgd, this.palette_));
-      }
+      // if (this.bkgd instanceof Array) {
+      //   push_(png, this.makebKGD_(this.bkgd, this.palette_));
+      // }
 
       // hIST
-      if (this.hist) {
-        push_(png, this.makehIST_(this.paletteHistogram_));
-      }
+      // if (this.hist) {
+      //   push_(png, this.makehIST_(this.paletteHistogram_));
+      // }
 
       // tRNS
       if (this.trns) {
-        push_(png, this.maketRNS_(imageInfo.tRNS));
+        trns = this.maketRNS_(imageInfo.tRNS);
       }
       break;
-    case CanvasTool.PngEncoder.ColourType.GRAYSCALE:
-    case CanvasTool.PngEncoder.ColourType.TRUECOLOR:
-    case CanvasTool.PngEncoder.ColourType.GRAYSCALE_WITH_ALPHA:
-    case CanvasTool.PngEncoder.ColourType.TRUECOLOR_WITH_ALPHA:
-      break;
     default:
-      throw new Error('unknown colour type');
+      throw new Error('Unsupported colour type');
   }
 
   // pHYs
-  if (typeof(this.phys) === 'object' && this.phys !== null) {
-    push_(png, this.makepHYs_(this.phys));
-  }
+  // if (typeof(this.phys) === 'object' && this.phys !== null) {
+  //   push_(png, this.makepHYs_(this.phys));
+  // }
 
-  // sPLT
-  if (typeof(this.splt) === 'object' && this.splt !== null) {
-    push_(png, this.makesPLT_(this.splt, this.colourHistogram_));
-  }
+  // // sPLT
+  // if (typeof(this.splt) === 'object' && this.splt !== null) {
+  //   push_(png, this.makesPLT_(this.splt, this.colourHistogram_));
+  // }
 
-  // tIME
-  if (this.time instanceof Date) {
-    push_(png, this.maketIME_(this.time));
-  }
+  // // tIME
+  // if (this.time instanceof Date) {
+  //   push_(png, this.maketIME_(this.time));
+  // }
 
-  // tEXt
-  if (typeof(this.text) === 'object' && this.text !== null) {
-    push_(png, this.maketEXt_(this.text));
-  }
+  // // tEXt
+  // if (typeof(this.text) === 'object' && this.text !== null) {
+  //   push_(png, this.maketEXt_(this.text));
+  // }
 
-  // zTXt
-  if (typeof(this.ztxt) === 'object' && this.ztxt !== null) {
-    push_(png, this.makezTXt_(this.ztxt));
-  }
+  // // zTXt
+  // if (typeof(this.ztxt) === 'object' && this.ztxt !== null) {
+  //   push_(png, this.makezTXt_(this.ztxt));
+  // }
 
-  // iTXt
-  if (typeof(this.itxt) === 'object' && this.itxt !== null) {
-    push_(png, this.makeiTXt_(this.itxt));
-  }
+  // // iTXt
+  // if (typeof(this.itxt) === 'object' && this.itxt !== null) {
+  //   push_(png, this.makeiTXt_(this.itxt));
+  // }
 
   // IDAT
-  push_(png, this.makeIDAT_(imageInfo.IDAT));
+  var idat = this.makeIDAT_(imageInfo.IDAT);
 
   // IEND
-  push_(png, this.makeIEND_());
+  var iend = this.makeIEND_();
+
+  var png = new Uint8Array(sig.length + hdr.length + plt.length + trns.length + idat.length + iend.length);
+
+  var offset = 0;
+  png.set(sig);
+  offset += sig.length;
+  png.set(hdr, offset);
+  offset += hdr.length;
+  png.set(plt, offset);
+  offset += plt.length;
+  png.set(trns, offset);
+  offset += trns.length;
+  png.set(idat, offset);
+  offset += idat.length;
+  png.set(iend, offset);
 
   return png;
 };
@@ -629,15 +654,15 @@ CanvasTool.PngEncoder.prototype.validate_ = function() {
  * @private
  */
 CanvasTool.PngEncoder.prototype.makeIHDR_ = function() {
-  var data = [];
+  var data = new Uint8Array(13), dataView = new DataView(data.buffer);
 
-  push_(data, this.networkByteOrder_(this.width, 4));
-  push_(data, this.networkByteOrder_(this.height, 4));
-  push_(data, this.networkByteOrder_(this.bitDepth, 1));
-  push_(data, this.networkByteOrder_(this.colourType, 1));
-  push_(data, this.networkByteOrder_(this.compressionMethod, 1));
-  push_(data, this.networkByteOrder_(this.filterMethod, 1));
-  push_(data, this.networkByteOrder_(this.interlaceMethod, 1));
+  dataView.setUint32(0, this.width);
+  dataView.setUint32(4, this.height);
+  data[8] = this.bitDepth;
+  data[9] = this.colourType;
+  data[10] = this.compressionMethod;
+  data[11] = this.filterMethod;
+  data[12] = this.interlaceMethod;
 
   return this.makeChunk_(CanvasTool.PngEncoder.ChunkType.IHDR, data);
 };
@@ -828,164 +853,9 @@ CanvasTool.PngEncoder.prototype.makeImageArray = function(canvasArray) {
   };
 };
 
-/**
- * 基礎色度
- * @param {!{
- *   whitePointX: !number,
- *   whitePointY: !number,
- *   redX: !number,
- *   redY: !number,
- *   greenX: !number,
- *   greenY: !number,
- *   blueX: !number,
- *   blueY: !number}} chrm 基礎色度情報.
- * @return {!Array} cHRM チャンク byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makecHRM_ = function(chrm) {
-  var data = [];
 
-  push_(data, this.networkByteOrder_(chrm.whitePointX * 10000 | 0, 4));
-  push_(data, this.networkByteOrder_(chrm.whitePointY * 10000 | 0, 4));
-  push_(data, this.networkByteOrder_(chrm.redX * 10000 | 0, 4));
-  push_(data, this.networkByteOrder_(chrm.redY * 10000 | 0, 4));
-  push_(data, this.networkByteOrder_(chrm.greenX * 10000 | 0, 4));
-  push_(data, this.networkByteOrder_(chrm.greenY * 10000 | 0, 4));
-  push_(data, this.networkByteOrder_(chrm.blueX * 10000 | 0, 4));
-  push_(data, this.networkByteOrder_(chrm.blueY * 10000 | 0, 4));
 
-  return this.makeChunk_(CanvasTool.PngEncoder.ChunkType.CHRM, data);
-};
 
-/**
- * ガンマ値
- * @param {!number} gamma ガンマ値.
- * @return {!Array} gAMA チャンク byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makegAMA_ = function(gamma) {
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.GAMA,
-    this.networkByteOrder_((100000 / gamma) + 0.5 | 0, 4)
-  );
-};
-/**
- * Significant bits
- * @param {!Array.<number>} sbit 元データの各色の有効ビット数を格納した配列.
- * @return {!Array} sBIT チャンク byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makesBIT_ = function(sbit) {
-  var data = [];
-
-  switch (this.colourType) {
-    case CanvasTool.PngEncoder.ColourType.GRAYSCALE:
-      // grayscale bits
-      if (sbit.length !== 1) {
-        throw new Error('wrong sBIT length');
-      }
-      push_(data, sbit.slice(0, 1));
-      break;
-    case CanvasTool.PngEncoder.ColourType.TRUECOLOR:
-      // red, green, blue bits
-      if (sbit.length !== 3) {
-        throw new Error('wrong sBIT length');
-      }
-      push_(data, sbit.slice(0, 3));
-      break;
-    case CanvasTool.PngEncoder.ColourType.INDEXED_COLOR:
-      // red, green, blue bits
-      if (sbit.length !== 3) {
-        throw new Error('wrong sBIT length');
-      }
-      push_(data, sbit.slice(0, 3));
-      break;
-    case CanvasTool.PngEncoder.ColourType.GRAYSCALE_WITH_ALPHA:
-      // grayscale, alpha bits
-      if (sbit.length !== 2) {
-        throw new Error('wrong sBIT length');
-      }
-      push_(data, sbit.slice(0, 2));
-      break;
-    case CanvasTool.PngEncoder.ColourType.TRUECOLOR_WITH_ALPHA:
-      // red, green, blue, alpha bits
-      if (sbit.length !== 4) {
-        throw new Error('wrong sBIT length');
-      }
-      push_(data, sbit.slice(0, 4));
-      break;
-    default:
-      throw new Error('unknown colour type');
-  }
-
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.SBIT,
-    data
-  );
-};
-
-/**
- * Standard RGB colour space.
- * @param {!CanvasTool.PngEncoder.RenderingIntent} ri レンダリング時の解釈仕様.
- * @return {!Array} sRGB チャンク byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makesRGB_ = function(ri) {
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.SRGB,
-    [ri]
-  );
-};
-
-/**
- * ICC プロファイル
- * XXX: 未テスト.
- * @param {!{
- *   name: !string,
- *   compressionMethod: !CanvasTool.PngEncoder.CompressionMethod,
- *   profile: !Array
- * }} iccp ICCP プロファイル.
- * @return {!Array} iCCP チャンク byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makeiCCP_ = function(iccp) {
-  var data = [],
-      namearray, c, i, l;
-
-  // profile name
-  namearray = bytearray_(iccp.name);
-  l = namearray.length;
-  if (l > 79) {
-    throw new Error('ICCP Profile name is over 79 characters');
-  }
-  for (i = 0; i < l; i++) {
-    if (!isLatin1Printable_(namearray[i])) {
-      throw new Error('wrong iccp profile name.');
-    }
-  }
-  push_(data, namearray);
-
-  // null separator
-  data.push(0);
-
-  // compression method
-  data.push(iccp.compressionMethod);
-
-  // profile
-  switch (iccp.compressionMethod) {
-    case CanvasTool.PngEncoder.CompressionMethod.DEFLATE:
-      push_(data, new Zlib.Deflate(iccp.profile, this.deflateOption).compress());
-      break;
-    default:
-      throw new Error('unknown ICC Profile compression method');
-      break;
-  }
-
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.ICCP,
-    data
-  );
-};
 
 /**
  * Background colour
@@ -1053,122 +923,9 @@ function(backgroundColour, palette) {
   );
 };
 
-/**
- * Image Histogram
- * @param {!Array.<number>} hist パレットエントリ毎の出現回数配列.
- * @return {!Array.<number>} hIST チャンク byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makehIST_ = function(hist) {
-  var data = [],
-      max = max_(hist),
-      h = 0,
-      i = 0,
-      l = hist.length;
 
-  // make histogram
-  for (; i < l; i++) {
-    // 0 は出現していない色のみであるべきなので 1 回でも出現したものは
-    // 1-65535 の範囲に分布する必要がある.
-    h = hist[i];
-    h = (h === 0) ? 0 : (h / max * (0xffff - 1) + 1) + 0.5 | 0;
-    push_(data, this.networkByteOrder_(h, 2));
-  }
 
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.HIST,
-    data
-  );
-};
 
-/**
- * Suggested palette
- * @param {?{
- *   name: string,
- *   num: number
- * }} splt sPLT 設定オブジェクト.
- * @param {!Array.<number>} hist パレットエントリ毎の出現回数配列.
- * @return {!Array.<number>} sPLT チャンク byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makesPLT_ = function(splt, hist) {
-  var data = [],
-      sortedHist,
-      max = 0,
-      i = 0,
-      l = splt.num < 0 ? hist.length : splt.num,
-      freq = 0,
-      red, green, blue, alpha;
-
-  // チャンクを付与しない
-  if (l === 0) {
-    return [];
-  }
-
-  // name
-  push_(data, bytearray_(splt.name));
-
-  // null separator
-  data.push(0);
-
-  // sample depth, RGBA value
-  switch (this.bitDepth) {
-    case 16:
-      data.push(16);
-      break;
-    case 8:
-    case 4:
-    case 2:
-    case 1:
-      data.push(8);
-      break;
-    default:
-      throw new Error('invalid bit depth');
-  }
-
-  // 出現頻度順にソート
-  sortedHist = hist.sort(function(a, b) {
-    return a.count < b.count ? 1 :
-           a.count > b.count ? -1 :
-           0;
-  });
-  max = sortedHist[0].count;
-
-  // make histogram
-  for (; i < l; i++) {
-    hist = sortedHist[i];
-
-    switch (this.bitDepth) {
-      // RGBA
-      case 16:
-        push_(data, this.networkByteOrder_(hist.red << 8 | hist.red, 2));
-        push_(data, this.networkByteOrder_(hist.green << 8 | hist.green, 2));
-        push_(data, this.networkByteOrder_(hist.blue << 8 | hist.blue, 2));
-        push_(data, this.networkByteOrder_(hist.alpha << 8 | hist.alpha, 2));
-        break;
-      case 8:
-      case 4:
-      case 2:
-      case 1:
-        data.push(hist.red);
-        data.push(hist.green);
-        data.push(hist.blue);
-        data.push(hist.alpha);
-        break;
-      default:
-        throw new Error('invalid bit depth');
-    }
-
-    // freq: 0-65535 の範囲にする
-    freq = hist.count / max * 0xffff + 0.5 | 0;
-    push_(data, this.networkByteOrder_(freq, 2));
-  }
-
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.SPLT,
-    data
-  );
-};
 
 /**
  * Palette
@@ -1184,56 +941,6 @@ CanvasTool.PngEncoder.prototype.makePLTE_ = function(palette) {
   return this.makeChunk_(
     CanvasTool.PngEncoder.ChunkType.PLTE,
     palette
-  );
-};
-
-/**
- * Physical pixel dimensions
- * @param {?{
- *   x: number,
- *   y: number,
- *   unit: CanvasTool.PngEncoder.UnitSpecifier
- * }} phys phisical pixel dimensions settings.
- * @return {!Array} pHYs チャンクバイナリ byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makepHYs_ = function(phys) {
-  var data = [];
-
-  push_(data, this.networkByteOrder_(phys.x, 4));
-  push_(data, this.networkByteOrder_(phys.y, 4));
-  data.push(phys.unit);
-
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.PHYS,
-    data
-  );
-};
-
-/**
- * Textual data
- * @param {?{
- *   keyword: string,
- *   text: string
- * }} text text data.
- * @return {!Array} tEXt チャンクバイナリ byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.maketEXt_ = function(text) {
-  var data = [];
-
-  // keyword
-  push_(data, bytearray_(text.keyword));
-
-  // null separator
-  data.push(0);
-
-  // text string
-  push_(data, bytearray_(text.text));
-
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.TEXT,
-    data
   );
 };
 
@@ -1276,99 +983,10 @@ CanvasTool.PngEncoder.prototype.makezTXt_ = function(text) {
   );
 };
 
-/**
- * International textual data
- * @param {?{
- *   keyword: string,
- *   text: string,
- *   lang: string,
- *   translatedKeyword: string,
- *   compressionMethod: ?CanvasTool.PngEncoder.CompressionMethod
- * }} text text data.
- * @return {!Array} iTXt チャンクバイナリ byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.makeiTXt_ = function(text) {
-  var data = [], compressedText;
-
-  // keyword
-  push_(data, bytearray_(text.keyword));
-
-  // null separator
-  data.push(0);
-
-  if (typeof(text.compressionMethod) === 'number') {
-    // compression flag
-    data.push(CanvasTool.PngEncoder.CompressionFlag.COMPRESSED);
-
-    // compression method
-    data.push(text.compressionMethod);
-
-    // text compression
-    switch (text.compressionMethod) {
-      case CanvasTool.PngEncoder.CompressionMethod.DEFLATE:
-        compressedText = new
-          Zlib.Deflate(bytearray_(utf8_(text.text)), this.deflateOption).compress();
-        break;
-      default:
-        throw new Error('unknown compression method');
-    }
-  } else {
-    // compression flag
-    data.push(CanvasTool.PngEncoder.CompressionFlag.UNCOMPRESSED);
-
-    // compression method
-    data.push(0);
-
-    // text
-    compressedText = bytearray_(utf8_(text.text));
-  }
-
-  // language tag
-  push_(data, bytearray_(text.lang));
-
-  // null separator
-  data.push(0);
-
-  // translated keyword
-  if (typeof(text.translatedKeyword) === 'string') {
-    push_(data, bytearray_(utf8_(text.translatedKeyword)));
-  }
-
-  // null separator
-  data.push(0);
-
-  // text
-  push_(data, compressedText);
-
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.ITXT,
-    data
-  );
-};
 
 
-/**
- * Image last-modification time
- * @param {Date} time last-modification time.
- * @return {!Array} tIME チャンクバイナリ byte array.
- * @private
- */
-CanvasTool.PngEncoder.prototype.maketIME_ = function(time) {
-  var data = [];
 
-  push_(data, this.networkByteOrder_(time.getUTCFullYear(), 2));
-  data.push(time.getUTCMonth() + 1);
-  data.push(time.getUTCDate());
-  data.push(time.getUTCHours());
-  data.push(time.getUTCMinutes());
-  data.push(time.getUTCSeconds());
 
-  return this.makeChunk_(
-    CanvasTool.PngEncoder.ChunkType.TIME,
-    data
-  );
-};
 
 /**
  * Image Data
@@ -1377,7 +995,7 @@ CanvasTool.PngEncoder.prototype.maketIME_ = function(time) {
  * @private
  */
 CanvasTool.PngEncoder.prototype.makeIDAT_ = function(pixelArray) {
-  var idat = [],
+  var idat = new Uint8Array(pixelArray.length + this.height),
       filterMethod = this.filterMethod,
       filterType = this.filterType,
       interlaceMethod = this.interlaceMethod,
@@ -1415,12 +1033,12 @@ CanvasTool.PngEncoder.prototype.makeIDAT_ = function(pixelArray) {
 
       // Pixel Array -> Byte Array
       // おそらくスキャンライン単位で行うのが正しい
-      line = this.pixelArrayToByteArray_(line);
+      //line = this.pixelArrayToByteArray_(line);
 
       switch (filterMethod) {
         case CanvasTool.PngEncoder.FilterMethod.BASIC:
-          idat.push(filterType);
-          push_(idat, this.filter_(line, bpp));
+          idat[y * (width + 1)] = filterType;
+          idat.set(this.filter_(line, bpp), y * (width + 1) + 1);
           break;
         default:
           throw new Error('unknown filter method');
@@ -1448,7 +1066,7 @@ CanvasTool.PngEncoder.prototype.makeIDAT_ = function(pixelArray) {
  * @private
  */
 CanvasTool.PngEncoder.prototype.makeIEND_ = function() {
-  return this.makeChunk_(CanvasTool.PngEncoder.ChunkType.IEND, []);
+  return this.makeChunk_(CanvasTool.PngEncoder.ChunkType.IEND, new Uint8Array(0));
 };
 
 /**
@@ -1461,23 +1079,23 @@ CanvasTool.PngEncoder.prototype.makeIEND_ = function() {
  * @private
  */
 CanvasTool.PngEncoder.prototype.maketRNS_ = function(alpha) {
-  var data = [], i;
+  var data = alpha;
 
-  switch (this.colourType) {
-    case CanvasTool.PngEncoder.ColourType.GRAYSCALE:
-      push_(data, this.networkByteOrder_(alpha[0], 2));
-      break;
-    case CanvasTool.PngEncoder.ColourType.TRUECOLOR:
-      push_(data, this.networkByteOrder_(alpha[0], 2));
-      push_(data, this.networkByteOrder_(alpha[1], 2));
-      push_(data, this.networkByteOrder_(alpha[2], 2));
-      break;
-    case CanvasTool.PngEncoder.ColourType.INDEXED_COLOR:
-      data = alpha;
-      break;
-    default:
-      throw new Error('invalid colour type');
-  }
+  // switch (this.colourType) {
+  //   case CanvasTool.PngEncoder.ColourType.GRAYSCALE:
+  //     push_(data, this.networkByteOrder_(alpha[0], 2));
+  //     break;
+  //   case CanvasTool.PngEncoder.ColourType.TRUECOLOR:
+  //     push_(data, this.networkByteOrder_(alpha[0], 2));
+  //     push_(data, this.networkByteOrder_(alpha[1], 2));
+  //     push_(data, this.networkByteOrder_(alpha[2], 2));
+  //     break;
+  //   case CanvasTool.PngEncoder.ColourType.INDEXED_COLOR:
+  //     data = alpha;
+  //     break;
+  //   default:
+  //     throw new Error('invalid colour type');
+  // }
 
   return this.makeChunk_(
     CanvasTool.PngEncoder.ChunkType.TRNS,
@@ -1845,18 +1463,22 @@ CanvasTool.PngEncoder.prototype.slice_ = function(arraylike, start, length) {
  * @private
  */
 CanvasTool.PngEncoder.prototype.makeChunk_ = function(type, data) {
-  var chunk = [], length = data.length, crcTarget = [];
+  var chunk = new Uint8Array(data.length + 12), length = data.length;
+
+  var dataView = new DataView(chunk.buffer);
 
   // Length
-  push_(chunk, this.networkByteOrder_(length, 4));
+  //push_(chunk, this.networkByteOrder_(length, 4));
+  dataView.setUint32(0, length);
   // Type
-  push_(chunk, type);
+  //push_(chunk, type);
+  chunk.set(type, 4)
   // Data
-  push_(chunk, data);
+  //push_(chunk, data);
+  chunk.set(data, 8);
   // CRC
-  push_(crcTarget, type);
-  push_(crcTarget, data);
-  push_(chunk, this.networkByteOrder_(Zlib.CRC32.calc(crcTarget), 4));
+  
+  dataView.setUint32(8 + data.length, Zlib.CRC32.calc(chunk.subarray(4, 8 + data.length)));
 
   return chunk;
 };
