@@ -26,32 +26,7 @@ CanvasTool.PngEncoder = function(canvas, opt_param) {
    */
   this.data;
 
-  if (canvas instanceof Element) {
-    width = canvas.width;
-    height = canvas.height;
-
-    /**
-     * 2D コンテキスト
-     * @type {Object}
-     */
-    ctx = canvas.getContext('2d');
-
-    this.data = ctx.getImageData(0, 0, width, height).data;
-  } else if (typeof(canvas.length) === 'number') {
-    if (typeof opt_param !== 'object') {
-      throw new Error('need opt_param object');
-    }
-    if (typeof opt_param['width'] !== 'number') {
-      throw new Error('width property not found');
-    }
-    if (typeof opt_param['height'] !== 'number') {
-      throw new Error('height property not found');
-    }
-
-    width = opt_param['width'];
-    height = opt_param['height'];
-    this.data = canvas;
-  } else if (canvas instanceof Object) {
+  if (canvas instanceof Object) {
     
     imageInfo = {};
     imageInfo.PLTE = canvas['PLTE'];
